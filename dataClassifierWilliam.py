@@ -23,14 +23,13 @@ import mira
 import samples
 import sys
 import util
+from pacman import GameState
 
 TEST_SET_SIZE = 100
-DIGIT_DATUM_WIDTH = 28
-DIGIT_DATUM_HEIGHT = 28
-FACE_DATUM_WIDTH = 60
-FACE_DATUM_HEIGHT = 70
-
-from util import manhattanDistance
+DIGIT_DATUM_WIDTH=28
+DIGIT_DATUM_HEIGHT=28
+FACE_DATUM_WIDTH=60
+FACE_DATUM_HEIGHT=70
 
 
 def basicFeatureExtractorDigit(datum):
@@ -44,11 +43,10 @@ def basicFeatureExtractorDigit(datum):
     for x in range(DIGIT_DATUM_WIDTH):
         for y in range(DIGIT_DATUM_HEIGHT):
             if datum.getPixel(x, y) > 0:
-                features[(x, y)] = 1
+                features[(x,y)] = 1
             else:
-                features[(x, y)] = 0
+                features[(x,y)] = 0
     return features
-
 
 def basicFeatureExtractorFace(datum):
     """
@@ -61,44 +59,10 @@ def basicFeatureExtractorFace(datum):
     for x in range(FACE_DATUM_WIDTH):
         for y in range(FACE_DATUM_HEIGHT):
             if datum.getPixel(x, y) > 0:
-                features[(x, y)] = 1
+                features[(x,y)] = 1
             else:
-                features[(x, y)] = 0
+                features[(x,y)] = 0
     return features
-
-
-def getRegions(datum):
-    def findNeighbours(x, y):
-        return [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
-
-    def addNeighbourToExplore(nx, ny, fringe, exploredSet, datum):
-        if pixelsAreOnGrid(nx, ny):
-            if (datum.getPixel(nx, ny) == 0):
-                fringe.push((nx, ny))
-                exploredSet.add((nx, ny))
-        return fringe, exploredSet
-
-    def pixelsAreOnGrid(x, y):
-        return (x >= 0) and (x < DIGIT_DATUM_WIDTH) and (y >= 0) and (y < DIGIT_DATUM_HEIGHT)
-
-    fringe = util.Stack()
-    regions = 0
-    closedSet = set()
-
-    for xPos in range(DIGIT_DATUM_WIDTH):
-        for yPos in range(DIGIT_DATUM_HEIGHT):
-            if (xPos, yPos) not in closedSet:
-                if (datum.getPixel(xPos, yPos) == 0):
-                    fringe.push((xPos, yPos))
-                    closedSet.add((xPos, yPos))
-                    regions += 1
-                    while not fringe.isEmpty():
-                        x, y = fringe.pop()
-                        for nx, ny in findNeighbours(x, y):
-                            if (nx, ny) not in closedSet:
-                                fringe, closedSet = addNeighbourToExplore(nx, ny, fringe, closedSet, datum)
-    return regions
-
 
 def enhancedFeatureExtractorDigit(datum):
     """
@@ -108,27 +72,52 @@ def enhancedFeatureExtractorDigit(datum):
     for this datum (datum is of type samples.Datum).
 
     ## DESCRIBE YOUR ENHANCED FEATURES HERE...
-        binary region count using dfs
+
     ##
     """
-    features = basicFeatureExtractorDigit(datum)
-
-    "*** YOUR CODE HERE ***"
-    features['oneRegion'] = 0
-    features['twoRegions'] = 0
-    features['moreThanTwoRegions'] = 0
-
-    regions = getRegions(datum)
-
-    if regions == 1:
-        features['oneRegion'] = 1
-    elif regions == 2:
-        features['twoRegions'] = 1
-    else:
-        features['moreThanTwoRegions'] = 1
-
+    #features =  basicFeatureExtractorDigit(datum)
+    #return features
+    
+    features = util.Counter()
+    
+    for x in range(DIGIT_DATUM_WIDTH):
+        for y in range(DIGIT_DATUM_HEIGHT):
+            if datum.getPixel(x, y) > 0:
+                features[(x,y)] = 1
+            else:
+                if checkDigitNeighbors(datum, x, y):
+                    features[(x,y)] = 1
+                else:
+                    features[(x,y)] = 0
+                
     return features
+    
+    "*** YOUR CODE HERE ***"
+    #util.raiseNotDefined()
 
+def checkDigitNeighbors(datum, x, y):
+    one = False
+    if (x + 1) < DIGIT_DATUM_WIDTH:
+        if datum.getPixel(x + 1, y) > 0:
+            one = True
+            
+    two = False
+    if (x - 1) >= 0:
+        if datum.getPixel(x - 1, y) > 0:
+            two = True
+            
+    three = False
+    if (y + 1) < DIGIT_DATUM_HEIGHT:
+        if datum.getPixel(x, y + 1) > 0:
+            three = True
+            
+    four = False
+    if (y - 1) >= 0:
+        if datum.getPixel(x, y - 1) > 0:
+            four = True
+            
+    #return one or two or three or four
+    return one or two or four
 
 def basicFeatureExtractorPacman(state):
     """
@@ -148,7 +137,6 @@ def basicFeatureExtractorPacman(state):
         features[action] = featureCounter
     return features, state.getLegalActions()
 
-
 def enhancedFeatureExtractorPacman(state):
     """
     Your feature extraction playground.
@@ -163,7 +151,6 @@ def enhancedFeatureExtractorPacman(state):
     for action in state.getLegalActions():
         features[action] = util.Counter(features[action], **enhancedPacmanFeatures(state, action))
     return features, state.getLegalActions()
-
 
 def enhancedPacmanFeatures(state, action):
     """
@@ -219,38 +206,36 @@ def enhancedPacmanFeatures(state, action):
     "*** YOUR CODE HERE ***"
     #util.raiseNotDefined()
     return features
-
-
-def neareastDistance(aPosition, positionsList):
-    distances = [manhattanDistance(loc, aPosition) for loc in positionsList]
-    if len(distances): return min(distances)
-    return 0
-
-
-def scaredGhostsCount(ghostPositions, numberOfGhosts, scaredTimes):
-    scaredGhosts = []
-    for i in xrange(0, numberOfGhosts):
-        if not scaredTimes[i] == 0:
-            scaredGhosts.append(ghostPositions[i])
-    return len(scaredGhosts)
-
+    
+def getClosestFood(pos, food):
+    # compare manhattan distances
+    min = ()
+    dist = 9999
+        
+    for x in range(food.width):
+        for y in range(food.height):
+            temp = util.manhattanDistance(pos, (x,y))
+            
+            if food[x][y] and temp <= dist:
+                min = (x,y)
+                dist = temp
+                
+    return dist
 
 def contestFeatureExtractorDigit(datum):
     """
     Specify features to use for the minicontest
     """
-    features = basicFeatureExtractorDigit(datum)
+    features =  basicFeatureExtractorDigit(datum)
     return features
-
 
 def enhancedFeatureExtractorFace(datum):
     """
     Your feature extraction playground for faces.
     It is your choice to modify this.
     """
-    features = basicFeatureExtractorFace(datum)
+    features =  basicFeatureExtractorFace(datum)
     return features
-
 
 def analysis(classifier, guesses, testLabels, testData, rawTestData, printImage):
     """
@@ -275,16 +260,17 @@ def analysis(classifier, guesses, testLabels, testData, rawTestData, printImage)
 
     # Put any code here...
     # Example of use:
-    # for i in range(len(guesses)):
-    # prediction = guesses[i]
-    # truth = testLabels[i]
-    # if (prediction != truth):
-    #         print "==================================="
-    #         print "Mistake on example %d" % i
-    #         print "Predicted %d; truth is %d" % (prediction, truth)
-    #         print "Image: "
-    #         print rawTestData[i]
-    #         break
+    for i in range(len(guesses)):
+        prediction = guesses[i]
+        truth = testLabels[i]
+        if (prediction != truth):
+            print "==================================="
+            print "Mistake on example %d" % i
+            #print "Predicted %d; truth is %d" % (prediction, truth)
+            print "Predicted", prediction, "; truth is", truth
+            print "Image: "
+            print rawTestData[i]
+            break
 
 
 ## =====================
@@ -307,23 +293,21 @@ class ImagePrinter:
         [(2,2), (2, 3), ...]
         where each tuple represents a pixel.
         """
-        image = samples.Datum(None, self.width, self.height)
+        image = samples.Datum(None,self.width,self.height)
         for pix in pixels:
             try:
-                # This is so that new features that you could define which
-                # which are not of the form of (x,y) will not break
-                # this image printer...
-                x, y = pix
+            # This is so that new features that you could define which
+            # which are not of the form of (x,y) will not break
+            # this image printer...
+                x,y = pix
                 image.pixels[x][y] = 2
             except:
                 print "new features:", pix
                 continue
         print image
 
-
 def default(str):
     return str + ' [Default: %default]'
-
 
 USAGE_STRING = """
   USAGE:      python dataClassifier.py <options>
@@ -340,29 +324,21 @@ USAGE_STRING = """
                  """
 
 
-def readCommand(argv):
+def readCommand( argv ):
     "Processes the command used to run from the command line."
     from optparse import OptionParser
-
     parser = OptionParser(USAGE_STRING)
 
-    parser.add_option('-c', '--classifier', help=default('The type of classifier'),
-                      choices=['mostFrequent', 'nb', 'naiveBayes', 'perceptron', 'mira', 'minicontest'],
-                      default='mostFrequent')
-    parser.add_option('-d', '--data', help=default('Dataset to use'), choices=['digits', 'faces', 'pacman'],
-                      default='digits')
+    parser.add_option('-c', '--classifier', help=default('The type of classifier'), choices=['mostFrequent', 'nb', 'naiveBayes', 'perceptron', 'mira', 'minicontest'], default='mostFrequent')
+    parser.add_option('-d', '--data', help=default('Dataset to use'), choices=['digits', 'faces', 'pacman'], default='digits')
     parser.add_option('-t', '--training', help=default('The size of the training set'), default=100, type="int")
-    parser.add_option('-f', '--features', help=default('Whether to use enhanced features'), default=False,
-                      action="store_true")
-    parser.add_option('-o', '--odds', help=default('Whether to compute odds ratios'), default=False,
-                      action="store_true")
+    parser.add_option('-f', '--features', help=default('Whether to use enhanced features'), default=False, action="store_true")
+    parser.add_option('-o', '--odds', help=default('Whether to compute odds ratios'), default=False, action="store_true")
     parser.add_option('-1', '--label1', help=default("First label in an odds ratio comparison"), default=0, type="int")
     parser.add_option('-2', '--label2', help=default("Second label in an odds ratio comparison"), default=1, type="int")
     parser.add_option('-w', '--weights', help=default('Whether to print weights'), default=False, action="store_true")
-    parser.add_option('-k', '--smoothing', help=default("Smoothing parameter (ignored when using --autotune)"),
-                      type="float", default=2.0)
-    parser.add_option('-a', '--autotune', help=default("Whether to automatically tune hyperparameters"), default=False,
-                      action="store_true")
+    parser.add_option('-k', '--smoothing', help=default("Smoothing parameter (ignored when using --autotune)"), type="float", default=2.0)
+    parser.add_option('-a', '--autotune', help=default("Whether to automatically tune hyperparameters"), default=False, action="store_true")
     parser.add_option('-i', '--iterations', help=default("Maximum iterations to run training"), default=3, type="int")
     parser.add_option('-s', '--test', help=default("Amount of test data to use"), default=TEST_SET_SIZE, type="int")
     parser.add_option('-g', '--agentToClone', help=default("Pacman agent to copy"), default=None, type="str")
@@ -381,7 +357,7 @@ def readCommand(argv):
     else:
         print "using minicontest feature extractor"
     print "training set size:\t" + str(options.training)
-    if (options.data == "digits"):
+    if(options.data=="digits"):
         printImage = ImagePrinter(DIGIT_DATUM_WIDTH, DIGIT_DATUM_HEIGHT).printImage
         if (options.features):
             featureFunction = enhancedFeatureExtractorDigit
@@ -389,13 +365,13 @@ def readCommand(argv):
             featureFunction = basicFeatureExtractorDigit
         if (options.classifier == 'minicontest'):
             featureFunction = contestFeatureExtractorDigit
-    elif (options.data == "faces"):
+    elif(options.data=="faces"):
         printImage = ImagePrinter(FACE_DATUM_WIDTH, FACE_DATUM_HEIGHT).printImage
         if (options.features):
             featureFunction = enhancedFeatureExtractorFace
         else:
             featureFunction = basicFeatureExtractorFace
-    elif (options.data == "pacman"):
+    elif(options.data=="pacman"):
         printImage = None
         if (options.features):
             featureFunction = enhancedFeatureExtractorPacman
@@ -406,7 +382,7 @@ def readCommand(argv):
         print USAGE_STRING
         sys.exit(2)
 
-    if (options.data == "digits"):
+    if(options.data=="digits"):
         legalLabels = range(10)
     else:
         legalLabels = ['Stop', 'West', 'East', 'North', 'South']
@@ -427,22 +403,22 @@ def readCommand(argv):
             print USAGE_STRING
             sys.exit(2)
 
-    if (options.classifier == "mostFrequent"):
+    if(options.classifier == "mostFrequent"):
         classifier = mostFrequent.MostFrequentClassifier(legalLabels)
-    elif (options.classifier == "naiveBayes" or options.classifier == "nb"):
+    elif(options.classifier == "naiveBayes" or options.classifier == "nb"):
         classifier = naiveBayes.NaiveBayesClassifier(legalLabels)
         classifier.setSmoothing(options.smoothing)
         if (options.autotune):
             print "using automatic tuning for naivebayes"
             classifier.automaticTuning = True
         else:
-            print "using smoothing parameter k=%f for naivebayes" % options.smoothing
-    elif (options.classifier == "perceptron"):
+            print "using smoothing parameter k=%f for naivebayes" %  options.smoothing
+    elif(options.classifier == "perceptron"):
         if options.data != 'pacman':
-            classifier = perceptron.PerceptronClassifier(legalLabels, options.iterations)
+            classifier = perceptron.PerceptronClassifier(legalLabels,options.iterations)
         else:
-            classifier = perceptron_pacman.PerceptronClassifierPacman(legalLabels, options.iterations)
-    elif (options.classifier == "mira"):
+            classifier = perceptron_pacman.PerceptronClassifierPacman(legalLabels,options.iterations)
+    elif(options.classifier == "mira"):
         if options.data != 'pacman':
             classifier = mira.MiraClassifier(legalLabels, options.iterations)
         if (options.autotune):
@@ -450,9 +426,8 @@ def readCommand(argv):
             classifier.automaticTuning = True
         else:
             print "using default C=0.001 for MIRA"
-    elif (options.classifier == 'minicontest'):
+    elif(options.classifier == 'minicontest'):
         import minicontest
-
         classifier = minicontest.contestClassifier(legalLabels)
     else:
         print "Unknown classifier:", options.classifier
@@ -470,15 +445,11 @@ def readCommand(argv):
 
 # Dictionary containing full path to .pkl file that contains the agent's training, validation, and testing data.
 MAP_AGENT_TO_PATH_OF_SAVED_GAMES = {
-    'FoodAgent': ('pacmandata/food_training.pkl', 'pacmandata/food_validation.pkl', 'pacmandata/food_test.pkl' ),
-    'StopAgent': ('pacmandata/stop_training.pkl', 'pacmandata/stop_validation.pkl', 'pacmandata/stop_test.pkl' ),
-    'SuicideAgent': (
-        'pacmandata/suicide_training.pkl', 'pacmandata/suicide_validation.pkl', 'pacmandata/suicide_test.pkl' ),
-    'GoodReflexAgent': (
-        'pacmandata/good_reflex_training.pkl', 'pacmandata/good_reflex_validation.pkl',
-        'pacmandata/good_reflex_test.pkl' ),
-    'ContestAgent': (
-        'pacmandata/contest_training.pkl', 'pacmandata/contest_validation.pkl', 'pacmandata/contest_test.pkl' )
+    'FoodAgent': ('pacmandata/food_training.pkl','pacmandata/food_validation.pkl','pacmandata/food_test.pkl' ),
+    'StopAgent': ('pacmandata/stop_training.pkl','pacmandata/stop_validation.pkl','pacmandata/stop_test.pkl' ),
+    'SuicideAgent': ('pacmandata/suicide_training.pkl','pacmandata/suicide_validation.pkl','pacmandata/suicide_test.pkl' ),
+    'GoodReflexAgent': ('pacmandata/good_reflex_training.pkl','pacmandata/good_reflex_validation.pkl','pacmandata/good_reflex_test.pkl' ),
+    'ContestAgent': ('pacmandata/contest_training.pkl','pacmandata/contest_validation.pkl', 'pacmandata/contest_test.pkl' )
 }
 # Main harness code
 
@@ -488,30 +459,26 @@ def runClassifier(args, options):
     featureFunction = args['featureFunction']
     classifier = args['classifier']
     printImage = args['printImage']
-
+    
     # Load data
     numTraining = options.training
     numTest = options.test
 
-    if (options.data == "pacman"):
+    if(options.data=="pacman"):
         agentToClone = args.get('agentToClone', None)
         trainingData, validationData, testData = MAP_AGENT_TO_PATH_OF_SAVED_GAMES.get(agentToClone, (None, None, None))
-        trainingData = trainingData or args.get('trainingData', False) or \
-                       MAP_AGENT_TO_PATH_OF_SAVED_GAMES['ContestAgent'][0]
-        validationData = validationData or args.get('validationData', False) or \
-                         MAP_AGENT_TO_PATH_OF_SAVED_GAMES['ContestAgent'][1]
+        trainingData = trainingData or args.get('trainingData', False) or MAP_AGENT_TO_PATH_OF_SAVED_GAMES['ContestAgent'][0]
+        validationData = validationData or args.get('validationData', False) or MAP_AGENT_TO_PATH_OF_SAVED_GAMES['ContestAgent'][1]
         testData = testData or MAP_AGENT_TO_PATH_OF_SAVED_GAMES['ContestAgent'][2]
         rawTrainingData, trainingLabels = samples.loadPacmanData(trainingData, numTraining)
         rawValidationData, validationLabels = samples.loadPacmanData(validationData, numTest)
         rawTestData, testLabels = samples.loadPacmanData(testData, numTest)
     else:
-        rawTrainingData = samples.loadDataFile("digitdata/trainingimages", numTraining, DIGIT_DATUM_WIDTH,
-                                               DIGIT_DATUM_HEIGHT)
+        rawTrainingData = samples.loadDataFile("digitdata/trainingimages", numTraining,DIGIT_DATUM_WIDTH,DIGIT_DATUM_HEIGHT)
         trainingLabels = samples.loadLabelsFile("digitdata/traininglabels", numTraining)
-        rawValidationData = samples.loadDataFile("digitdata/validationimages", numTest, DIGIT_DATUM_WIDTH,
-                                                 DIGIT_DATUM_HEIGHT)
+        rawValidationData = samples.loadDataFile("digitdata/validationimages", numTest,DIGIT_DATUM_WIDTH,DIGIT_DATUM_HEIGHT)
         validationLabels = samples.loadLabelsFile("digitdata/validationlabels", numTest)
-        rawTestData = samples.loadDataFile("digitdata/testimages", numTest, DIGIT_DATUM_WIDTH, DIGIT_DATUM_HEIGHT)
+        rawTestData = samples.loadDataFile("digitdata/testimages", numTest,DIGIT_DATUM_WIDTH,DIGIT_DATUM_HEIGHT)
         testLabels = samples.loadLabelsFile("digitdata/testlabels", numTest)
 
 
@@ -527,8 +494,7 @@ def runClassifier(args, options):
     print "Validating..."
     guesses = classifier.classify(validationData)
     correct = [guesses[i] == validationLabels[i] for i in range(len(validationLabels))].count(True)
-    print str(correct), ("correct out of " + str(len(validationLabels)) + " (%.1f%%).") % (
-        100.0 * correct / len(validationLabels))
+    print str(correct), ("correct out of " + str(len(validationLabels)) + " (%.1f%%).") % (100.0 * correct / len(validationLabels))
     print "Testing..."
     guesses = classifier.classify(testData)
     correct = [guesses[i] == testLabels[i] for i in range(len(testLabels))].count(True)
@@ -536,10 +502,10 @@ def runClassifier(args, options):
     analysis(classifier, guesses, testLabels, testData, rawTestData, printImage)
 
     # do odds ratio computation if specified at command line
-    if ((options.odds) & (options.classifier == "naiveBayes" or (options.classifier == "nb")) ):
+    if((options.odds) & (options.classifier == "naiveBayes" or (options.classifier == "nb")) ):
         label1, label2 = options.label1, options.label2
-        features_odds = classifier.findHighOddsFeatures(label1, label2)
-        if (options.classifier == "naiveBayes" or options.classifier == "nb"):
+        features_odds = classifier.findHighOddsFeatures(label1,label2)
+        if(options.classifier == "naiveBayes" or options.classifier == "nb"):
             string3 = "=== Features with highest odd ratio of label %d over label %d ===" % (label1, label2)
         else:
             string3 = "=== Features for which weight(label %d)-weight(label %d) is biggest ===" % (label1, label2)
@@ -547,15 +513,14 @@ def runClassifier(args, options):
         print string3
         printImage(features_odds)
 
-    if ((options.weights) & (options.classifier == "perceptron")):
+    if((options.weights) & (options.classifier == "perceptron")):
         for l in classifier.legalLabels:
             features_weights = classifier.findHighWeightFeatures(l)
-            print ("=== Features with high weight for label %d ===" % l)
+            print ("=== Features with high weight for label %d ==="%l)
             printImage(features_weights)
-
 
 if __name__ == '__main__':
     # Read input
-    args, options = readCommand(sys.argv[1:])
+    args, options = readCommand( sys.argv[1:] )
     # Run classifier
     runClassifier(args, options)

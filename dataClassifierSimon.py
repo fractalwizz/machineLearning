@@ -165,59 +165,34 @@ def enhancedFeatureExtractorPacman(state):
     return features, state.getLegalActions()
 
 
-def enhancedPacmanFeatures(state, action):
+def enhancedPacmanFeatures(successor, action):
     """
     For each state, this function is called with each legal action.
     It should return a counter with { <feature name> : <feature value>, ... }
     """
     features = util.Counter()
-    
-    # StopAgent
-    if action == 'Stop':
-        features["Stop"] = 1
-    else:
-        features["Stop"] = 0
-    
-    minh = 0
-    
-    successor = state.generateSuccessor(0, action)
-    pac = successor.getPacmanPosition()
-    
-    # SuicideAgent
-    for ghost in successor.getGhostPositions():
-        temp = util.manhattanDistance(pac, ghost) / 2
-        minh = max(temp, minh)
-        #if util.manhattanDistance(successor.getPacmanPosition(), ghost) < 2:
-        #    features["close-to-ghost"] = 1
-        #else:
-        #    features["close-to-ghost"] = 0
-    features["close-to-ghost"] = minh
-        
-    # Losing
-    if successor.isLose():
-        features["suicide"] = 1
-    else:
-        features["suicide"] = 0
-        
-    # FoodAgent
-    dist = 9 - getClosestFood(pac, successor.getFood())
-    if dist < 0:
-        dist = 1
-    features["food"] = dist
-    
-    # ContestAgent
-    closestPellet = 9999
-    capsule = successor.getCapsules()
-    
-    if capsule:
-        for pellet in capsule:
-            closestPellet = min(closestPellet, util.manhattanDistance(pac, pellet))
-        features["capsule"] = 10 - closestPellet
-    else:
-        features["capsule"] = 0
-        
     "*** YOUR CODE HERE ***"
-    #util.raiseNotDefined()
+    successor = successor.generateSuccessor(0, action)
+    pacmanPosition = successor.getPacmanPosition()
+    score = 10.0
+
+    features['foodLeft'] = successor.getNumFood()
+
+    foodPositions = successor.getFood().asList()
+    nearestFood = neareastDistance(pacmanPosition, foodPositions)
+    nearestFood = score / nearestFood if nearestFood else nearestFood
+    features['nearestFood'] = nearestFood
+
+    ghostPositions = successor.getGhostPositions()
+    nearestGhost = neareastDistance(pacmanPosition, ghostPositions)
+    nearestGhost = score / nearestGhost if nearestGhost else nearestGhost
+    features['nearestGhost'] = nearestGhost
+
+    ghostStates = successor.getGhostStates()
+    scaredTimes = [ghostState.scaredTimer for ghostState in ghostStates]
+    scaredGhosts = scaredGhostsCount(ghostPositions, len(ghostPositions), scaredTimes)
+    features['scaredGhostsCount'] = score / scaredGhosts if scaredGhosts  else scaredGhosts
+
     return features
 
 
